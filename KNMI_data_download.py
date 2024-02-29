@@ -16,7 +16,7 @@ directory = os.getcwd()
 
 parameter = 'spi1_daily'
 
-api_token = 'eyJvcmciOiI1ZTU1NGUxOTI3NGE5NjAwMDEyYTNlYjEiLCJpZCI6IjMwZGI1ZDhhOGRhYjQyNjI4MjM3YTZiYTk5OWU3MDNjIiwiaCI6Im11cm11cjEyOCJ9'
+api_token = 'Some_token'
 
 url = "https://api.dataplatform.knmi.nl/open-data/v1/datasets/spi1_daily/versions/1.0/files/"
 header = {"Authorization": f"Bearer {api_token}"}
