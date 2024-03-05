@@ -132,6 +132,7 @@ for period in Two_periods:
     plt.show()
     
     months_numbers = [1,3,6,12,24]
+    # months_numbers = [1]
     ## define perdiod for calculating values
     # months_number = 24   
     
@@ -194,10 +195,12 @@ for period in Two_periods:
         
         spi_monthly_array = spi_monthly_array.where(zero_value_mask == 1, drop = True)
         
+        spi_monthly_array = spi_monthly_array['SPI'][period[0]:period[1],:,:]
+        
         #%%
         ## Plot the spatial distribution of infinite values and convert into nan
         
-        count_infinite = np.isinf(spi_monthly_array['SPI']).sum(dim='time')
+        count_infinite = np.isinf(spi_monthly_array).sum(dim='time')
         
         fig = plt.figure(figsize=(12, 8))
         clevs = np.linspace(0,80,9)
@@ -218,7 +221,7 @@ for period in Two_periods:
         plt.show()
         
         coordinate = np.unravel_index(count_infinite.argmax(), count_infinite.shape)
-        spi_monthly_array['SPI'][:,coordinate[0],coordinate[1]].plot()
+        spi_monthly_array[:,coordinate[0],coordinate[1]].plot()
         plt.title('SPI time-series for most infinite values', fontsize = 25)
         plot_text = 'Infinite values: ' + str(count_infinite.max().values)
         plt.text(-8000, 8, plot_text, fontsize=10, color='black')
@@ -231,19 +234,22 @@ for period in Two_periods:
         spi_monthly_array_1 = spi_monthly_array.copy()
         
         # Create a new dataset with NaN values where infinite values exist
-        spi_monthly_array_1['SPI'] = spi_monthly_array_1['SPI'].where(spi_monthly_array_1['SPI'] != np.inf, drop = False)
+        spi_monthly_array_1 = spi_monthly_array_1.where(spi_monthly_array_1 != np.inf, drop = False)
         
         #spi_monthly_array_1['SPI'] = spi_monthly_array_1['SPI'].fillna(spi_monthly_array_1['SPI'])
         
         os.chdir(r'C:\Users\tojo1\Documents\Speciale\Data\pressure_data')
         
-        periods = [str(' MJJAS ' + perioder[q] ), str(' NDJFM '+ perioder[q]), str(' All year ' + perioder[q] )]
+        periods = [str(' MJJAS ' + perioder[q] ), str(' NDJFM '+ perioder[q]), str(' Annual ' + perioder[q] )]
         
         months_period = [[5,6,7,8,9],[1,2,3,11,12],[1,2,3,4,5,6,7,8,9,10,11,12]]
         
         num = 0
         
-        for period in periods:
+        z_values_means = []
+        sp_values_means = []
+        
+        for periode in periods:
             
             months = months_period[num]
                 
@@ -252,7 +258,7 @@ for period in Two_periods:
             # Read data from existing daatafile
             ERA5_data = xr.load_dataset('ERA5_GP500_50_2023.grib', engine = 'cfgrib')
             # Extract geopotential from datafile
-            z_values = ERA5_data['z'][:-9]
+            z_values = ERA5_data['z'][period[0]:period[1]]
             
             #z_values = z_values[60:300,:,:]
             
@@ -325,6 +331,7 @@ for period in Two_periods:
             
             print('EOF 500 hPa calculation done')
             
+            
              #%%
             # ## plotting SPI values for year 1976
             
@@ -348,7 +355,7 @@ for period in Two_periods:
             # Read data from existing daatafile
             ERA5_datas = xr.load_dataset('ERA5_MSLP_50_2023.grib', engine = 'cfgrib')
             # Extract geopotential from datafile
-            sp_values = ERA5_datas['msl'][:-9]  
+            sp_values = ERA5_datas['msl'][period[0]:period[1]] 
             
             #sp_values = sp_values[60:300,:,:]
             
@@ -417,63 +424,91 @@ for period in Two_periods:
             
             print('EOF MSLP calculation done')
             #%%
-            ## plot the EOF results for MSLP and Z500
-            ### MAKE UNITS IN HPA!!!!
-            ## For Z500
+           
+            z_values_plot = z_values.mean(dim='time') /  9.80665
+            z_values_means.append(z_values_plot)
+            
+            fig = plt.figure(figsize=(15, 8))
+            clevs = np.linspace(5000, 6000, 21)
+            proj = ccrs.Orthographic(central_longitude=-20, central_latitude=60)
+            ax = plt.axes(projection=proj)
+            ax.coastlines()
+            contourf = z_values_plot.plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
+                                     transform=ccrs.PlateCarree(), add_colorbar=False)
+            ax.set_title('500 hPa level mean field' + periode, fontsize=27)
+            cbar = plt.colorbar(contourf, ax=ax)
+            cbar.set_label('Geopotential (m)', fontsize=17)
+            plt.show()
+            
             for i in eof_res_array['EOF']:
                 fig = plt.figure(figsize=(11.5, 6.8))
-                clevs = np.linspace(-0.009, 0.009, 19)
+                clevs = np.linspace(-0.01, 0.01, 21)
                 proj = ccrs.Orthographic(central_longitude=-20, central_latitude=60)
                 ax = plt.axes(projection=proj)
                 ax.coastlines()
                 eof_res_array['modes'][i-1].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
                 plot_text = str(round(varfrac[i-1]*100, 1)) + '%'
-                ax.set_title('EOF' + str(eof_res_array['EOF'][i-1].values) + ' GP500 anomaly' + period, fontsize=25)
+                ax.set_title('EOF' + str(eof_res_array['EOF'][i-1].values) + ' GP500 anomaly' + periode, fontsize=25)
                 plt.text(-5000000, -3900000, plot_text, fontsize=25, color='black')
                 plt.show()
             
             ## for MSLP
+            sp_values_plot = sp_values.mean(dim='time') / 100
+            sp_values_means.append(sp_values_plot)
+            
+            fig = plt.figure(figsize=(15, 8))
+            clevs = np.linspace(993, 1033, 21)
+            proj = ccrs.Orthographic(central_longitude=-20, central_latitude=60)
+            ax = plt.axes(projection=proj)
+            ax.coastlines()
+            contourf = sp_values_plot.plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
+                                     transform=ccrs.PlateCarree(), add_colorbar=False)
+            ax.set_title('MSLP mean field' + periode, fontsize=27)
+            cbar = plt.colorbar(contourf, ax=ax)
+            cbar.set_label('MSLP (hPa)', fontsize=17)
+            plt.show()
+            
             for i in eof_res_array_sf['EOF']:
                 fig = plt.figure(figsize=(11.5, 6.8))
-                clevs = np.linspace(-0.009, 0.009, 19)
+                clevs = np.linspace(-0.01, 0.01, 21)
                 proj = ccrs.Orthographic(central_longitude=-20, central_latitude=60)
                 ax = plt.axes(projection=proj)
                 ax.coastlines()
                 eof_res_array_sf['modes'][i-1].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
-                ax.set_title('EOF' + str(eof_res_array_sf['EOF'][i-1].values) + ' MSLP anomaly' + period, fontsize=25)
+                ax.set_title('EOF' + str(eof_res_array_sf['EOF'][i-1].values) + ' MSLP anomaly' + periode, fontsize=25)
                 plot_text = str(round(varfrac_sf[i-1]*100, 1)) + '%'
                 plt.text(-5000000, -3900000, plot_text, fontsize=25, color='black')
                 plt.show()
-            
+
             num_subplots = 4
-            
+
             # Create a 2x4 grid of subplots
             fig, axs = plt.subplots(2, num_subplots, figsize=(20, 8), 
                                     subplot_kw={'projection': ccrs.Orthographic(central_longitude=-20, 
                                                                                 central_latitude=60)})
-            
+
             # Flatten the 2D array of subplots into a 1D array
             axs = axs.flatten()
-            
+
             # Plotting correlations for GP500
             for i, ax in enumerate(axs[:num_subplots]):
-                clevs = np.linspace(-0.009, 0.009, 21)
+                clevs = np.linspace(-0.01, 0.01, 21)
                 ax.coastlines()
-               
+                
                 eof_res_array['modes'][i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                           transform=ccrs.PlateCarree(), add_colorbar=False)
                 plot_text = str(round(varfrac[i]*100, 1)) + '%'
-                subtitle = 'PC' + str(i+1) + ' GP500 ' + plot_text
+                subtitle = 'EOF' + str(i+1) + ' GP500 ' + plot_text
                 ax.set_title(subtitle, fontsize=20)
                 
                 #plt.show()
             # Plotting correlations for MSLP
             for i, ax in enumerate(axs[num_subplots:]):
-                clevs = np.linspace(-0.009, 0.009, 21)
+                clevs = np.linspace(-0.01, 0.01, 21)
                 ax.coastlines()
-            
+                
                 eof_res_array_sf['modes'][i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                             transform=ccrs.PlateCarree(), add_colorbar=False)
                 plot_text = str(round(varfrac_sf[i]*100, 1)) + '%'
@@ -483,67 +518,17 @@ for period in Two_periods:
                                                                             cmap=plt.cm.RdBu_r, 
                                                                             add_colorbar=False), orientation='vertical')
             cax1.xaxis.label.set_text('')
-            cax1.title.set_text('')
-            
-            # Adjust layout for better spacing
+            cax1.title.set_text('') 
             plt.tight_layout()
-            
-            plt.title('EOF modes of variability in North Atlantic' + period, fontsize = 46, loc='right', pad=33)
-            
-            # Show the plot
+            plot_text = 'Explained variance - GP500: ' + str(round(varfrac.sum()*100,1)) + '% - MSLP: ' + str(round(varfrac_sf.sum()*100,1)) + '%'
+            #plt.text(-36,0.0095, plot_text, fontsize=25, color='black')
+            plt.suptitle('EOF modes of variability in North Atlantic' + periode, y=1.12, ha='center', fontsize = 45)
+            plt.title(plot_text, x=-25, y=1.05, fontsize=28, color ='gray')
+
             plt.show()
-            
-            
+
+
             print('EOF plots')
-            
-            # num_subplots = 4
-            
-            # # Create a 2x4 grid of subplots
-            # fig, axs = plt.subplots(2, num_subplots, figsize=(20, 8), 
-            #                         subplot_kw={'projection': ccrs.Orthographic(central_longitude=-20, 
-            #                                                                     central_latitude=60)})
-            
-            # # Flatten the 2D array of subplots into a 1D array
-            # axs = axs.flatten()
-            
-            # # Plotting correlations for GP500
-            # for i, ax in enumerate(axs[:num_subplots]):
-            #     clevs = np.linspace(-500, 500, 21)
-            #     ax.coastlines()
-               
-            #     eof_res_array_GP[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
-            #                               transform=ccrs.PlateCarree(), add_colorbar=False)
-            #     plot_text = str(round(varfrac[i]*100, 1)) + '%'
-            #     subtitle = 'PC' + str(i+1) + ' GP500 ' + plot_text
-            #     ax.set_title(subtitle, fontsize=20)
-                
-            #     #plt.show()
-            # # Plotting correlations for MSLP
-            # for i, ax in enumerate(axs[num_subplots:]):
-            #     clevs = np.linspace(-10, 10, 21)
-            #     ax.coastlines()
-            
-            #     eof_res_array_sf_hPa[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
-            #                                 transform=ccrs.PlateCarree(), add_colorbar=False)
-            #     plot_text = str(round(varfrac_sf[i]*100, 1)) + '%'
-            #     ax.set_title('EOF' + str(i+ 1) + ' MSLP ' + plot_text, fontsize=20)
-            # cax1 = fig.add_axes([1, 0.05, 0.02, 0.9])  # Adjust the position and size of the colorbar
-            # colorbar1 = Colorbar(ax=cax1, mappable=eof_res_array['modes'][0].plot.contourf(levels = clevs, 
-            #                                                                 cmap=plt.cm.RdBu_r, 
-            #                                                                 add_colorbar=False), orientation='vertical')
-            # cax1.xaxis.label.set_text('')
-            # cax1.title.set_text('')
-            
-            # # Adjust layout for better spacing
-            # plt.tight_layout()
-            
-            # plt.title('EOF modes of variability in North Atlantic' + period, fontsize = 48, loc='right', pad=33)
-            
-            # # Show the plot
-            # plt.show()
-            
-            # print('New EOF plots')
-            
             
             #%%
             ## Calculate correlation between SPI and PC's
@@ -577,9 +562,9 @@ for period in Two_periods:
             
             ## Find correlations on of PC and the SPI-values
             if len(pcs) <= len(selected_SPI_data['time']):
-                corr = correlation_map(pcs[t:len(pcs)],selected_SPI_data['SPI'][t:len(pcs)].values)
+                corr = correlation_map(pcs[t:len(pcs)],selected_SPI_data[t:len(pcs)].values)
             else:
-                corr = correlation_map(pcs[t:len(selected_SPI_data['time'])],selected_SPI_data['SPI'][t:len(selected_SPI_data['time'])].values)
+                corr = correlation_map(pcs[t:len(selected_SPI_data['time'])],selected_SPI_data[t:len(selected_SPI_data['time'])].values)
                 
             ## correlation data as Xarray dataarray
             corr_xr = xr.DataArray(
@@ -601,7 +586,8 @@ for period in Two_periods:
                 #ax.set_global()
                 corr_xr[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month '+ period +' corr', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month '+ periode
+                             +' corr', fontsize=20)
                 plt.show()
             
             ### Calculate the correlations for the MSLP
@@ -624,9 +610,9 @@ for period in Two_periods:
             
             ## Find correlations on of PC and the SPI-values
             if len(pcs) <= len(selected_SPI_data['time']):
-                corr_sf = correlation_map(pcs_sf[t:len(pcs)],selected_SPI_data['SPI'][t:len(pcs)].values)
+                corr_sf = correlation_map(pcs_sf[t:len(pcs)],selected_SPI_data[t:len(pcs)].values)
             else:
-                corr_sf = correlation_map(pcs_sf[t:len(selected_SPI_data['time'])],selected_SPI_data['SPI'][t:len(selected_SPI_data['time'])].values)
+                corr_sf = correlation_map(pcs_sf[t:len(selected_SPI_data['time'])],selected_SPI_data[t:len(selected_SPI_data['time'])].values)
                 
             
             ## correlation data as Xarray dataarray
@@ -652,7 +638,7 @@ for period in Two_periods:
                 #ax.set_global()
                 corr_sf_xr[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
-                ax.set_title('PC' + str(corr_sf_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month '+ period +' corr', fontsize=20)
+                ax.set_title('PC' + str(corr_sf_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month '+ periode +' corr', fontsize=20)
                 plt.show()
             
             print('surface correlations calculation done')
@@ -698,7 +684,7 @@ for period in Two_periods:
             # Adjust layout for better spacing
             plt.tight_layout()
             
-            plt.title('PCs and ' + str(months_number) + '-months SPI-value correlation coefficient' + period, fontsize = 41, loc='right', pad=33)
+            plt.title('PCs and ' + str(months_number) + '-months SPI-value correlation coefficient' + periode, fontsize = 41, loc='right', pad=33)
             
             # Show the plot
             plt.show()
@@ -733,7 +719,7 @@ for period in Two_periods:
                 #ax.set_global()
                 high_corr_xr[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month '+ period +' Hcorr', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month '+ periode +' Hcorr', fontsize=20)
                 plt.show()
             
             high_corr_sf = ma.masked_inside(corr_sf_xr, -H, H)
@@ -752,7 +738,7 @@ for period in Two_periods:
                 ax.coastlines()
                 high_corr_sf_xr[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month '+ period +' Hcorr', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month '+ periode +' Hcorr', fontsize=20)
                 plt.show()
             
             num_subplots = 4
@@ -795,7 +781,7 @@ for period in Two_periods:
             # Adjust layout for better spacing
             plt.tight_layout()
             
-            plt.title('PCs and ' + str(months_number) + '-months SPI-value high correlation coefficients' + period, fontsize = 38, loc='right', pad=33)
+            plt.title('PCs and ' + str(months_number) + '-months SPI-value high correlation coefficients' + periode, fontsize = 38, loc='right', pad=33)
             
             # Show the plot
             plt.show()
@@ -813,7 +799,7 @@ for period in Two_periods:
             for i in range(neof):
                 for lat in range(len(lats)):
                     for lon in range(len(longs)):
-                        calc_data = selected_SPI_data['SPI'][t:,lat,lon]
+                        calc_data = selected_SPI_data[t:,lat,lon]
                         if np.isnan(calc_data).any() ==  True:
                             regressions[i, lat, lon] = np.nan
                         else:
@@ -838,7 +824,7 @@ for period in Two_periods:
             for i in range(neof):
                 for lat in range(len(lats)):
                     for lon in range(len(longs)):
-                        calc_data = selected_SPI_data['SPI'][t:,lat,lon]
+                        calc_data = selected_SPI_data[t:,lat,lon]
                         if np.isnan(calc_data).any() ==  True:
                             regressions_sf[i, lat, lon] = np.nan
                         else:
@@ -868,7 +854,7 @@ for period in Two_periods:
                 #ax.set_global()
                 regressions_xr[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' Z500 and SPI ' + str(months_number) + '-month'+ period +' RegSlope', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' Z500 and SPI ' + str(months_number) + '-month'+ periode +' RegSlope', fontsize=20)
                 plt.show()
             
             print('look at those plots!')
@@ -882,7 +868,8 @@ for period in Two_periods:
                 #ax.set_global()
                 regressions_sf_xr[i].plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
                                          transform=ccrs.PlateCarree(), add_colorbar=True)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month'+ period +' RegSlope', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month'+ periode
+                             +' RegSlope', fontsize=20)
                 plt.show()
             
             print('More beautiful plots are made!')
@@ -927,7 +914,7 @@ for period in Two_periods:
             # Adjust layout for better spacing
             plt.tight_layout()
             
-            plt.title('PCs and ' + str(months_number) + '-months SPI-value regression slope' + period, fontsize = 45, loc='right', pad=33)
+            plt.title('PCs and ' + str(months_number) + '-months SPI-value regression slope' + periode, fontsize = 45, loc='right', pad=33)
             
             # Show the plot
             plt.show()
@@ -955,7 +942,7 @@ for period in Two_periods:
                                                 transform = ccrs.PlateCarree(), 
                                                 hatches = [hatching_pattern], 
                                                 add_colorbar=False, linestyles = (['-']))
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month'+ period +' corr', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month'+ periode +' corr', fontsize=20)
                 plt.show()
             
             
@@ -980,7 +967,7 @@ for period in Two_periods:
                                                 transform=ccrs.PlateCarree(), 
                                                 hatches = [hatching_pattern], 
                                                 alpha = alpha, add_colorbar=False)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month'+ period +' corr', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month'+ periode +' corr', fontsize=20)
                 plt.show()
             print('Hatched in stead of masked high correlations')
             
@@ -1047,10 +1034,11 @@ for period in Two_periods:
             # Adjust layout for better spacing
             plt.tight_layout()
             
-            plt.title('PCs and ' + str(months_number) + '-months SPI-value correlation coefficients' + period, fontsize = 41, loc='right', pad=33)
+            plt.title('PCs and ' + str(months_number) + '-months SPI-value correlation coefficients' + periode, fontsize = 41, loc='right', pad=33)
             
             plt.show()
             
+         
             #%%
             ## Plotting data with contour line for EOF-modes
             for i in corr_xr['PC']:
@@ -1071,7 +1059,7 @@ for period in Two_periods:
                                                 cmap=plt.cm.RdBu,
                                                 transform = ccrs.PlateCarree(), 
                                                 hatches = [hatching_pattern], 
-                                                add_colorbar=False)
+                                                add_colorbar=False,alpha=0)
                 
                 clevs_eof = np.linspace(-0.010, 0.010, 21)
                 contour_plot = eof_res_array['modes'][i].plot.contour(ax=ax, levels=clevs_eof,
@@ -1081,7 +1069,7 @@ for period in Two_periods:
                                           else 'solid' for val in clevs_eof], 
                                          colors ='k', alpha = 1)
                 ax.clabel(contour_plot, fontsize = 7)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month'+ period +' corr', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month 50-22 corr', fontsize=25)
                 plt.show()
             
             
@@ -1105,7 +1093,7 @@ for period in Two_periods:
                                                 cmap=plt.cm.RdBu,
                                                 transform=ccrs.PlateCarree(), 
                                                 hatches = [hatching_pattern], 
-                                                add_colorbar=False)
+                                                add_colorbar=False,alpha=0)
                 
                 clevs_eof = np.linspace(-0.010, 0.010, 21)
                 contour_plot = eof_res_array_sf['modes'][i].plot.contour(ax=ax, levels=clevs_eof,
@@ -1115,7 +1103,7 @@ for period in Two_periods:
                                           else 'solid' for val in clevs_eof], 
                                          colors ='k', alpha =1)
                 ax.clabel(contour_plot, fontsize = 7)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month'+ period +' corr', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month 50-22 corr', fontsize=25)
                 plt.show()
             
             
@@ -1145,7 +1133,7 @@ for period in Two_periods:
                                                 cmap=plt.cm.RdBu,
                                                 transform=ccrs.PlateCarree(), 
                                                 hatches = [hatching_pattern], 
-                                                add_colorbar=False)
+                                                add_colorbar=False,alpha=0)
                 
                 clevs_eof = np.linspace(-50, 50, 21)
                 contour_plot = eof_res_array_GP[i].plot.contour(ax=ax, levels=clevs_eof,
@@ -1156,7 +1144,7 @@ for period in Two_periods:
                                          colors ='k', alpha =1)
                 ax.clabel(contour_plot, fontsize = 8)
                 plot_text = str(round(varfrac[i]*100, 1)) + '%'
-                subtitle = 'PC' + str(i+1) + ' GP500 - ' + plot_text
+                subtitle = 'EOF' + str(i+1) + ' GP500 - ' + plot_text
                 ax.set_title(subtitle, fontsize=20)
                 
                 #plt.show()
@@ -1172,7 +1160,7 @@ for period in Two_periods:
                 hatching_pattern = '....'
                 # Set hatching pattern in the masked region
                 hatches[mask] = hatching_pattern
-                alpha = 0.5
+                alpha = 0
                 
                 hatches = np.where(mask, hatching_pattern, hatches)
                 high_corr_sf_xr[i].plot.contourf(ax=ax, levels=clevs, 
@@ -1181,7 +1169,7 @@ for period in Two_periods:
                                                 hatches = [hatching_pattern], 
                                                 alpha = alpha, add_colorbar=False)
                 
-                clevs_eof = np.linspace(-7, 7, 15)
+                clevs_eof = np.linspace(-10, 10, 21)
                 contour_plot = eof_res_array_sf_hPa[i].plot.contour(ax=ax, levels=clevs_eof,
                                          transform=ccrs.PlateCarree(), add_colorbar=False,
                                          linewidths = 0.7, linestyles = 
@@ -1191,7 +1179,7 @@ for period in Two_periods:
                 ax.clabel(contour_plot, fontsize = 8)
                 
                 plot_text = str(round(varfrac_sf[i]*100, 1)) + '%'
-                ax.set_title(f'PC{corr_sf_xr["PC"][i].values + 1} MSLP - ' + plot_text, fontsize=20)
+                ax.set_title(f'EOF{corr_sf_xr["PC"][i].values + 1} MSLP - ' + plot_text, fontsize=20)
             cax1 = fig.add_axes([1, 0.05, 0.02, 0.9])  # Adjust the position and size of the colorbar
             colorbar1 = Colorbar(ax=cax1, mappable=corr_xr[0].plot.contourf(levels = clevs, 
                                                                             cmap=plt.cm.RdBu, 
@@ -1203,9 +1191,10 @@ for period in Two_periods:
             plt.tight_layout()
             
             plt.title('PCs and ' + str(months_number) + '-months SPI-value correlation coefficients' + 
-                      period, fontsize = 51, loc='right', pad=33)
+                      periode, fontsize = 51, loc='right', pad=33)
             
             plt.show()    
+        
             
             
             #%%
@@ -1230,7 +1219,7 @@ for period in Two_periods:
                                                 transform=ccrs.PlateCarree(), 
                                                 hatches = [hatching_pattern], 
                                                 add_colorbar=False)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month'+ period +' RegSlope', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' GP500 and SPI ' + str(months_number) + '-month'+ periode +' RegSlope', fontsize=20)
                 plt.show()
             
             
@@ -1254,7 +1243,7 @@ for period in Two_periods:
                                                 transform=ccrs.PlateCarree(), 
                                                 hatches = [hatching_pattern], 
                                                 add_colorbar=False)
-                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month'+ period +' RegSlope', fontsize=20)
+                ax.set_title('PC' + str(corr_xr['PC'][i].values+1) + ' MSLP and SPI ' + str(months_number) + '-month'+ periode +' RegSlope', fontsize=20)
                 plt.show()
             
             
@@ -1322,7 +1311,7 @@ for period in Two_periods:
             # Adjust layout for better spacing
             plt.tight_layout()
             
-            plt.title('PCs and ' + str(months_number) + '-months SPI-value regression slopes' + period, fontsize = 45, loc='right', pad=33)
+            plt.title('PCs and ' + str(months_number) + '-months SPI-value regression slopes' + periode, fontsize = 45, loc='right', pad=33)
             
             plt.show()
             
@@ -1340,7 +1329,7 @@ for period in Two_periods:
             
             eof_res_array['corr'] = corr_xr_edit
             eof_res_array['reg'] = regressions_xr_edit
-            eof_res_array.to_netcdf('500hPa_correlation_analysis_' + str(months_number) + '_month_extended_summer_season.nc' + period)
+            eof_res_array.to_netcdf('500hPa_correlation_analysis_' + str(months_number) + '_month_extended_summer_season.nc' + periode)
             
             corr_sf_xr_edit = corr_sf_xr
             corr_sf_xr_edit['latitude'] = corr_sf_xr_edit['latitude'] + 0.125
@@ -1352,11 +1341,79 @@ for period in Two_periods:
             
             eof_res_array_sf['corr'] = corr_sf_xr_edit
             eof_res_array_sf['reg'] = regressions_sf_xr_edit
-            eof_res_array_sf.to_netcdf('MSLP_correlation_analysis_' + str(months_number) + '_month_extended_summer_season.nc' + period)
+            eof_res_array_sf.to_netcdf('MSLP_correlation_analysis_' + str(months_number) + '_month_extended_summer_season.nc' + periode)
             
             num = num + 1    
         
             print('This calculation is done!')
+    #%%
+        sp_values_plot = sp_values.mean(dim='time') / 100
+        sp_values_means.append(sp_values_plot)
+        
+        fig = plt.figure(figsize=(15, 8))
+        clevs = np.linspace(993, 1033, 21)
+        proj = ccrs.Orthographic(central_longitude=-20, central_latitude=60)
+        ax = plt.axes(projection=proj)
+        ax.coastlines()
+        contourf = sp_values_plot.plot.contourf(ax=ax, levels=clevs, cmap=plt.cm.RdBu_r,
+                                 transform=ccrs.PlateCarree(), add_colorbar=False)
+        ax.set_title('MSLP mean field' + periode, fontsize=27)
+        cbar = plt.colorbar(contourf, ax=ax)
+        cbar.set_label('MSLP (hPa)', fontsize=17)
+        plt.show()
+        
+        num_subplots = 3
+
+        # Create a 2x4 grid of subplots
+        fig, axs = plt.subplots(2, num_subplots, figsize=(21, 10.5), 
+                                subplot_kw={'projection': ccrs.Orthographic(central_longitude=-20, 
+                                                                            central_latitude=60)})
+
+        # Flatten the 2D array of subplots into a 1D array
+        axs = axs.flatten()
+
+        # Plotting correlations for GP500
+        for i, ax in enumerate(axs[:num_subplots]):
+            clevs_z500 = np.linspace(5000, 6000, 21)
+            ax.coastlines()
+            
+            z_values_means[i].plot.contourf(ax=ax, levels=clevs_z500, cmap=plt.cm.RdBu_r,
+                                      transform=ccrs.PlateCarree(), add_colorbar=False)
+            subtitle = 'Z500' + periods[i]
+            ax.set_title(subtitle, fontsize=20)
+            
+        for i, ax in enumerate(axs[num_subplots:]):
+            clevs_sp = np.linspace(993, 1033, 21)
+            ax.coastlines()
+            
+            sp_values_means[i].plot.contourf(ax=ax, levels=clevs_sp, cmap=plt.cm.RdBu_r,
+                                        transform=ccrs.PlateCarree(), add_colorbar=False)
+            subtitle = 'MSLP' + periods[i]
+            ax.set_title(subtitle, fontsize=20)
+        cax1 = fig.add_axes([1, 0.52, 0.015, 0.43])  # Adjust the position and size of the colorbar
+        colorbar1 = Colorbar(ax=cax1, mappable=z_values_means[0].plot.contourf(levels = clevs_z500, 
+                                                                        cmap=plt.cm.RdBu_r, 
+                                                                        add_colorbar=False), orientation='vertical')
+        cax1.xaxis.label.set_text('')
+        cax1.title.set_text('') 
+        colorbar1.set_label('Geopotential height (m)', fontsize=15)
+        
+        cax2 = fig.add_axes([1, 0.04, 0.015, 0.43])  # Adjust the position and size of the colorbar
+        colorbar2 = Colorbar(ax=cax2, mappable=sp_values_means[0].plot.contourf(levels = clevs_sp, 
+                                                                        cmap=plt.cm.RdBu_r, 
+                                                                        add_colorbar=False), orientation='vertical')
+        cax2.xaxis.label.set_text('')
+        cax2.title.set_text('') 
+        colorbar2.set_label('MSLP (hPa)', fontsize=15)
+        
+        plt.tight_layout()
+        # plot_text = 'Explained variance - GP500: ' + str(round(varfrac.sum()*100,1)) + '% - MSLP: ' + str(round(varfrac_sf.sum()*100,1)) + '%'
+        #plt.text(-36,0.0095, plot_text, fontsize=25, color='black')
+        plt.suptitle('Mean Atmospheric modes for Z500 and MSLP ' + perioder[q], y=1.05, ha='center', fontsize = 40)
+        # plt.title(plot_text, x=-25, y=1.07, fontsize=28, color ='gray')
+
+        plt.show()
+
     q = q+1
 #%%
 end_time = time.time()
